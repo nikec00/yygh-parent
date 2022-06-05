@@ -2,6 +2,7 @@ package com.atguigu.yygh.model.hosp;
 
 import com.atguigu.yygh.model.base.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -47,6 +48,7 @@ public class HospitalSet extends BaseEntity {
 
 	@ApiModelProperty(value = "状态")
 	@TableField("status")
+	@TableLogic
 	private Integer status;
 
 }
