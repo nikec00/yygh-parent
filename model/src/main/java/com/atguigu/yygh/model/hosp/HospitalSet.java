@@ -48,7 +48,6 @@ public class HospitalSet extends BaseEntity {
 
 	@ApiModelProperty(value = "状态")
 	@TableField("status")
-	@TableLogic
 	private Integer status;
 
 }
