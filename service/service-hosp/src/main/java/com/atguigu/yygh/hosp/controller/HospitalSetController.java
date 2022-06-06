@@ -21,6 +21,7 @@ import java.util.Random;
  * @author nkc
  * @date 22/6/1
  */
+@CrossOrigin
 @Api(tags = "医院设置管理")
 @RestController
 @RequestMapping("/admin/hosp/hospitalSet")
@@ -101,7 +102,7 @@ public class HospitalSetController {
 
     @ApiOperation(value = "通过id获取医院设置")
     @GetMapping("getHospSet/{id}")
-    public Result getHospSet(@PathVariable long id) {
+    public Result getHospSet(@PathVariable String id) {
         HospitalSet hospitalSet = hospitalSetService.getById(id);
         return Result.ok(hospitalSet);
     }
