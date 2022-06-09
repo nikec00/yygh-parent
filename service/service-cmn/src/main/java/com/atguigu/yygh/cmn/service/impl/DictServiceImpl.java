@@ -1,6 +1,7 @@
 package com.atguigu.yygh.cmn.service.impl;
 
 import com.alibaba.excel.EasyExcel;
+import com.alibaba.fastjson.JSONObject;
 import com.atguigu.yygh.cmn.listener.DictListener;
 import com.atguigu.yygh.cmn.mapper.DictMapper;
 import com.atguigu.yygh.cmn.service.DictService;
@@ -8,17 +9,22 @@ import com.atguigu.yygh.model.cmn.Dict;
 import com.atguigu.yygh.vo.cmn.DictEeVo;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author nkc
@@ -28,18 +34,28 @@ import java.util.List;
 public class DictServiceImpl extends ServiceImpl<DictMapper, Dict> implements DictService {
     @Autowired
     private DictMapper dictMapper;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
-    @Cacheable(value = "dict", keyGenerator = "keyGenerator")
+    //    @Cacheable(value = "dict", keyGenerator = "keyGenerator")
     @Override
     public List<Dict> findChildData(Long id) {
-        QueryWrapper<Dict> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("parent_id", id);
-        List<Dict> dictList = baseMapper.selectList(queryWrapper);
-        dictList.forEach(ele -> {
-            Long dictId = ele.getId();
-            boolean isChild = this.isChildren(dictId);
-            ele.setHasChildren(isChild);
-        });
+        List<Dict> dictList;
+        Object data = redisTemplate.opsForValue().get("cmn:dict:" + id);
+        if (null == data) {
+            QueryWrapper<Dict> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("parent_id", id);
+            dictList = baseMapper.selectList(queryWrapper);
+            dictList.forEach(ele -> {
+                Long dictId = ele.getId();
+                boolean isChild = this.isChildren(dictId);
+                ele.setHasChildren(isChild);
+            });
+            redisTemplate.opsForValue().set("cmn:dict:" + id, JSONObject.toJSON(dictList), 500, TimeUnit.SECONDS);
+        } else {
+            String s = data.toString();
+            dictList = JSONObject.parseArray(s, Dict.class);
+        }
         return dictList;
     }
 
@@ -64,12 +80,22 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, Dict> implements Di
         }
     }
 
+    /**
+     * 采用延时双删
+     * @param file
+     */
     @Override
-    @CacheEvict(value = "dict", allEntries = true)
+//    @CacheEvict(value = "dict", allEntries = true)
     public void importDict(MultipartFile file) {
         try {
+            Set keys = redisTemplate.keys("cmn:dict:*");
+            redisTemplate.delete(keys);
             EasyExcel.read(file.getInputStream(), DictEeVo.class, new DictListener(baseMapper)).sheet().doRead();
+            Thread.sleep(500);
+            redisTemplate.delete(keys);
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
